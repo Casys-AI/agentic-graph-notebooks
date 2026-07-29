@@ -1,0 +1,6 @@
+# Le coeur (agentgraph/) ne depend que de la bibliotheque standard.
+# Ces paquets ne servent qu'aux notebooks : affichage et visualisation.
+jupyterlab>=4.0
+matplotlib>=3.7
+pandas>=2.0
+networkx>=3.0
