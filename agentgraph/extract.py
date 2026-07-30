@@ -1,9 +1,8 @@
 """Extract an action graph from agent execution traces.
 
-The central problem: an agent that writes shell does not produce *actions*, it
-produces *programs*. There is no obvious granularity at which its actions form a
-good vocabulary. Too coarse and the graph collapses into a near-clique; too fine
-and it scatters into a dust of singletons.
+An agent that writes shell emits programs, not single actions, so there is no
+granularity that obviously makes a good vocabulary. Too coarse and the graph
+collapses into a near-clique; too fine and almost every atom is a singleton.
 
 This module splits each compound command on its shell operators (`&&`, `;`, `|`)
 — the boundaries the model itself wrote — and handles inline Python with a real
@@ -40,7 +39,7 @@ OPS = {"docker", "systemctl", "kill", "ps", "top", "journalctl", "crontab",
 # block has been incorrectly split. Excluding them avoids phantom atoms such as
 # `for`, `const`, `import`.
 LANG_KEYWORDS = {
-    "for", "if", "then", "fi", "do", "done", "else", "elif", "while",
+    "for", "if", "then", "fi", "do", "done", "else", "elif", "while", "until",
     "const", "let", "var", "import", "from", "with", "def", "class",
     "return", "in", "EOF", "PY", "EOSQL",
 }
@@ -141,14 +140,13 @@ def iter_shell_commands(sessions_glob: str) -> Iterator[tuple[ToolCall, str]]:
 def split_segments(command: str) -> list[str]:
     """Split a compound command on its shell operators.
 
-    WARNING — this is where the most important correctness decision in the whole
-    module lives. A naive regex split on `|` also cuts inside quoted strings:
-    `grep -E 'a|b|c'` then becomes three "commands", and each fragment produces
-    a phantom atom (`awk.print1`, `awk.print2`, …) that has no real command
-    behind it.  On real corpora this single bug manufactures a substantial
-    fraction of the vocabulary from thin air.
+    A regex split on `|` also cuts inside quoted strings: `grep -E 'a|b|c'`
+    becomes three "commands", and each fragment produces a phantom atom
+    (`awk.print1`, `awk.print2`, …) with no real command behind it.  On real
+    corpora that inflates the vocabulary substantially.
 
-    `shlex` with `punctuation_chars` respects quotes and avoids this.
+    `shlex` with `punctuation_chars` respects quotes and avoids this.  Keep that
+    property if you rewrite this function.
     """
     segments: list[str] = []
     for line in command.split("\n"):
@@ -299,8 +297,8 @@ def extract_inline_python(command: str) -> list[str]:
 def python_atoms(source: str) -> set[str]:
     """Extract imports and calls from a Python block via its AST.
 
-    Python is parsed with a real syntax tree — a decisive advantage over shell,
-    which only yields to heuristics.
+    Python has a parser; shell does not, so shell segmentation stays heuristic
+    while this path works on a real syntax tree.
 
     Shell-interpolated variables (`$TOKEN`) are replaced before analysis;
     otherwise the block is not valid Python.
@@ -407,12 +405,12 @@ _SECRET_PATTERNS = [
 def mask_secrets(text: str) -> str:
     """Mask secrets in a command before any display or sharing.
 
-    Agent traces contain tokens in plain text — systematically, not
-    accidentally. Always pass output through this function before displaying
-    a command in a notebook intended for sharing.
+    Agent traces routinely carry Bearer tokens, API keys and exported secrets in
+    plain text. Pass any command through this function before displaying it in a
+    notebook meant for sharing.
 
-    This masking reduces the risk; it does not eliminate it. Always review
-    output before publishing.
+    The patterns cover common forms only: this reduces the risk without
+    eliminating it. Review output before publishing.
     """
     for pattern in _SECRET_PATTERNS:
         text = pattern.sub(r"\1***", text)

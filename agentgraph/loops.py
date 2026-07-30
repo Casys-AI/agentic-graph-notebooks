@@ -1,32 +1,35 @@
 """Syntactic inventory of explicit loops in shell commands.
 
-The article that motivates this analysis finds that **the aggregated transition
-graph undercounts real loops** — 91 of the 103 commands containing explicit loop
-constructs have no corresponding atom in the segment graph, because the
-segmentation used there emits no atom for `for` or `while` keywords.
+The segmentation that builds the action graph drops loop keywords: `for`, `while`
+and `until` are in `LANG_KEYWORDS`, so is the `do` that opens the body.  Two
+consequences — the iteration itself leaves no trace, and the first command of the
+body, which `split_segments` returns glued to `do`, leaves no atom either.  Later
+commands in the body do produce atoms, with nothing marking them as repeated.  On
+the corpus behind the companion article, 91 of the 103 commands carrying an
+explicit loop construct fall in that blind spot.
 
-This module does the accounting from the raw command text.  It answers three
-questions about your traces:
+This module counts them from the raw command text instead, along three axes:
 
 1. **How many commands contain an explicit loop?**
-   Counts `for`, `while`, `xargs`, and `find -exec` constructs separately.
+   Counts `for`, `while`, `until`, `xargs` and `find -exec` constructs
+   separately.
 
 2. **How many of those loops are invisible to the segment graph?**
-   An "invisible" loop is a `for`/`while`/`until` keyword construct: the
-   parser used to build the action graph does not emit an atom for the keyword
-   itself, so those commands have no footprint in the graph.
+   An "invisible" loop is a `for`/`while`/`until` keyword construct: the keyword
+   is dropped, so nothing in the graph says the body ran more than once.  A
+   `xargs` or `find -exec` loop is visible — the binary itself becomes an atom.
 
 3. **Are loops local?**
-   For each loop-bearing command, decomposes it into prefix / loop-body /
-   suffix.  If the prefix and suffix rarely contain *another* loop, the loop is
-   structurally local — the recursive pressure is contained.
+   Decomposes each loop-bearing command into prefix / loop-body / suffix, and
+   reports how often the prefix or suffix carries *another* loop.  A low rate
+   means loops sit at one level rather than nesting.
 
 ## Methodological note
 
-This is a syntactic inventory, not a graph traversal.  It does not detect all
-forms of feedback: a `curl → jq → curl` cycle in the transition graph is real
-feedback that this module cannot see.  The two measurements are complementary,
-not redundant.
+This is a syntactic inventory, not a graph traversal.  It sees no feedback that
+is not written as a loop keyword: a `curl → jq → curl` cycle in the transition
+graph is real feedback this module does not count.  Read it next to
+`condensation.py`, which measures the graph side.
 
 ## Usage
 

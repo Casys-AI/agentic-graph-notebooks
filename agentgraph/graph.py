@@ -1,16 +1,24 @@
 """Graph metrics and motif extraction.
 
-The decisive criterion: a graph is only useful if knowing a node's neighbours
-tells you something *specific to that node*.
+Projects hyperedges into a weighted co-occurrence graph and measures whether a
+node's neighbourhood is specific to that node.
 
-There are therefore two opposite ways to fail:
+Two regimes make the neighbourhood unreadable:
 
-- **too sparse** — most nodes have no neighbours; there is nothing to look at;
-- **too dense** — every node touches nearly every other; node A's neighbourhood
-  is the same as node B's, so it discriminates nothing.
+- **too sparse** — the average node touches almost none of the others, so there
+  is little co-occurrence to compare;
+- **too dense** — the average node touches a large share of them, so node A's
+  neighbourhood matches node B's and discriminates nothing.
 
-The informative band observed on real traces: density 1–6%, mean degree 10–15.
-These bounds are empirical, not theoretical — measure your own.
+`GraphMetrics.verdict()` places a graph relative to both. It reads `density`
+alone (plus a floor on node count), with < 0.002 and > 0.15 as cutoffs.
+
+Density is the mean degree expressed as a fraction of the `N-1` other nodes
+(`mean_degree = density × (N-1)`), so it is a global average: it says nothing
+about the shape of the degree distribution. A hub-and-spoke graph can be globally
+sparse and still have one node wired to everything — `degree_entropy` and
+`top5_mass` are the fields that show that. The cutoffs come from traces measured
+for the companion article, not from theory; recalibrate them on your own corpus.
 """
 
 from __future__ import annotations
@@ -35,14 +43,16 @@ class GraphMetrics:
     singleton_rate: float
 
     def verdict(self) -> str:
-        """Locate the graph relative to the two degenerate regimes."""
+        """Locate the graph on density, with a floor on node count."""
         if self.density > 0.15:
-            return "TOO DENSE — close to a clique, neighbourhoods no longer discriminate"
+            return ("TOO DENSE — density above 0.15, the average node touches "
+                    "over 15% of the other nodes")
         if self.nodes < 20:
             return "TOO FEW NODES — vocabulary too coarse, or corpus too small"
         if self.density < 0.002:
-            return "TOO SPARSE — dust of singletons, almost no edges"
-        return "INFORMATIVE REGIME — neighbourhoods carry information"
+            return ("TOO SPARSE — density below 0.002, the average node touches "
+                    "under 0.2% of the other nodes")
+        return "INFORMATIVE REGIME — density between 0.002 and 0.15"
 
     def __str__(self) -> str:
         return (f"N={self.nodes} · edges={self.edges} · density={self.density:.4f} · "
@@ -114,8 +124,8 @@ def metrics(edges: list[Hyperedge], min_occurrences: int = 2) -> GraphMetrics:
 def granularity_sweep(sessions_glob: str, variants: dict[str, dict]) -> list[dict]:
     """Sweep several granularities and compare the resulting regimes.
 
-    This is the most instructive experiment in the set: it shows where your
-    corpus tips from clique to dust, and whether an informative band exists.
+    Shows at which granularity a given corpus crosses from near-clique to
+    near-empty, and whether a band between the two exists at all.
     """
     from .extract import build_hyperedges
 
@@ -178,13 +188,11 @@ def motifs(edges: list[Hyperedge], min_occurrences: int = 2,
            min_size: int = 3) -> list[dict]:
     """Extract recurring motifs and trace them back to real commands.
 
-    A statistical motif without a human name proves nothing. The output always
-    includes examples of commands — masked — so you can judge for yourself
-    whether the grouping makes sense or whether the algorithm has assembled
-    unrelated things.
+    Each motif carries masked example commands so the grouping can be checked
+    by hand instead of on its score alone.
 
-    Expect three categories: usable motifs, real but trivial ones (`cd` then
-    `ls` is a genuine motif and a worthless one), and pure artefacts.
+    Expect three categories in the output: usable motifs, real but trivial ones
+    (`cd` then `ls` recurs, and tells you nothing), and parsing artefacts.
     """
     pairs = cooccurrence(edges, min_occurrences)
     labels = communities(pairs)

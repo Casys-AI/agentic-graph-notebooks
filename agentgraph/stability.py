@@ -1,17 +1,14 @@
-"""Temporal stability: does the agent develop routines?
+"""Temporal stability of motifs across time windows.
 
-This is the question that decides whether "procedural memory" means anything.
-If an agent repeats the same sequences over time, they can be factorised and
-replayed. Otherwise, there is nothing to memorise.
+Splits the hyperedges into N time windows and compares the first window with the
+last on three axes: shared vocabulary (Jaccard), shared graph structure, and rank
+correlation of edge weights.
 
-**The random baseline is not optional.** Two time windows necessarily share
-vocabulary: they come from the same agent, on the same machine, with the same
-tools. A raw persistence score is therefore uninterpretable. The only question
-that matters is: *beyond chance?*
-
-To answer it, the same hyperedges are redistributed randomly across the same
-windows, multiple times, and compared. Without this control, you publish numbers
-that mean nothing — and they will be high, therefore convincing.
+Two windows from the same agent tend to share vocabulary — same machine, same
+tools, same operator — so a raw persistence score cannot be read on its own.
+`temporal_stability()` redistributes the same hyperedges randomly across the same
+windows over several trials and reports the observed score next to that baseline.
+A score at or below the shuffled distribution carries no signal.
 """
 
 from __future__ import annotations
@@ -140,8 +137,7 @@ def temporal_stability(edges: list[Hyperedge], n_windows: int = 2,
     if len(dated) < n_windows * 30:
         raise ValueError(
             f"Corpus too small: {len(dated)} dated hyperedges for {n_windows} "
-            f"windows. At least ~30 per window are needed for the measures to "
-            f"mean anything."
+            f"windows. At least 30 dated hyperedges per window are required."
         )
 
     size = len(dated) // n_windows
@@ -172,7 +168,7 @@ def temporal_stability(edges: list[Hyperedge], n_windows: int = 2,
 
 
 def describe_windows(edges: list[Hyperedge], n_windows: int = 2) -> list[dict]:
-    """Describe the windows before analysis — read this before drawing any conclusions."""
+    """Per-window composition: date range, session count, agent mix, dominance."""
     dated = sorted([e for e in edges if e.timestamp], key=lambda e: e.timestamp)
     size = len(dated) // n_windows
     rows = []

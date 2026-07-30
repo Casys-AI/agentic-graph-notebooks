@@ -1,27 +1,19 @@
-"""Reading-budget analysis: what does the agent ask for in its own head/tail?
+"""Reading-budget analysis: the bound the agent writes in its own head/tail.
 
-When an agent truncates output, it writes the bound itself — `head -n 3`,
-`tail -n 80`.  That number is committed *before* the output is visible, which
-makes it a bet on how much information is about to matter.
+When an agent truncates output it writes the bound itself — `head -n 3`,
+`tail -n 80` — and commits that number before the output is visible.
 
-## The key insight
+## Conditioning
 
-The agent is not just deciding *how much* to read.  It is deciding *how much*
-to read **based on what it just did**.  After a git delivery the median is 3
-lines — enough to see whether the commit landed.  After a Python script, 80 —
-the order of magnitude of a full output or a traceback.  A factor of ×27 on
-the same read gesture.
+`n_lines` depends on the preceding action type, which is the edge in the
+transition graph.  On the article's corpus the median is 3 lines after a git
+delivery and 80 after a Python script: a factor of ×27 on the same gesture.
 
-This makes `n_lines` a **conditioning variable**: its distribution depends on
-the preceding action type (the "edge" in the transition graph).  A
-Kruskal-Wallis test measures whether the edge explains a significant fraction
-of the variance in `n_lines`.  ε² (eta-squared for the KW test) quantifies
-the effect size.
-
-A **permutation test** (1,000 reshuffles of the observations across edges) is
-not optional.  Without it, a high ε² is uninterpretable: the same number of
-distinct edges would produce a high statistic even if `n_lines` were drawn
-from one distribution.
+A Kruskal-Wallis test measures how much of the variance in `n_lines` the edge
+explains, and ε² (eta-squared for KW) gives the effect size.  ε² on its own
+cannot be read: the same number of distinct edges produces a high statistic even
+when every observation is drawn from one distribution.  `permutation_test()`
+reshuffles the observations across edges to produce the null.
 
 The article reports:
 - Median 3 lines (IQR 2) after git delivery; median 80 (IQR 160) after a
@@ -298,9 +290,8 @@ def permutation_test(
     The article reports p_perm = 0/1,000 = 0.000 for n_lines over 16 action
     types and 295 observations.
 
-    **This test is not optional.**  The same ε² on different group structures
-    has different meaning.  Without the permutation control, a high ε² is
-    uninterpretable.
+    The same ε² carries different meaning on different group structures, so a
+    high value cannot be read without this control.
     """
     groups_raw: dict[str, list[float]] = collections.defaultdict(list)
     for t in transitions:
@@ -344,11 +335,12 @@ def permutation_test(
             f"p_perm = {p_perm:.3f} ({count_ge}/{n_perm} permutations reach "
             f"ε² ≥ {eps2_obs:.3f}).  "
             + (
-                "The result is NOT above chance: permuted data achieves the "
-                "same effect size."
+                "At least 5% of permutations reach the observed effect size: "
+                "not above chance."
                 if p_perm >= 0.05 else
-                "The result is above chance: the preceding action genuinely "
-                "predicts the reading budget."
+                "Fewer than 5% of permutations reach the observed effect size, "
+                "so the association does not follow from the group structure "
+                "alone."
             )
         ),
     }

@@ -1,4 +1,4 @@
-"""Turn agent execution traces into a graph and measure whether it means anything."""
+"""Build an action graph from agent execution traces and measure its structure."""
 from .extract import build_hyperedges, iter_tool_calls, mask_secrets
 from .graph import metrics, motifs, granularity_sweep
 from .stability import temporal_stability, describe_windows

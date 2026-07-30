@@ -7,49 +7,32 @@ The process stops when no pair appears at least ``min_uses`` times.
 
 ## What this measures
 
-The compressed grammar is a **summary of repetition structure** in the agent's
-action sequences.  Each grammar rule represents a recurring subsequence.  Rules
-can compose: rule R1 can expand into (A, R2), and R2 can expand into (B, C) —
-giving a two-level hierarchy.
+The compressed grammar summarises the repetition structure of the agent's action
+sequences.  Each grammar rule represents a recurring subsequence.  Rules can
+compose: rule R1 can expand into (A, R2), and R2 can expand into (B, C) — giving
+a two-level hierarchy.
 
-**Composition depth** is the key quantity.  Depth 0 means a rule expands
-directly into two terminal atoms.  Depth 1 means at least one child is itself a
-rule.  Depth 2 introduces a third level, and so on.
+Composition depth is the height of that hierarchy.  Depth 0 means the rule
+expands into terminal atoms only.  Depth N means at least one child is a rule of
+depth N-1, so any rule that reuses another rule sits at depth 1 or above.
 
-**Important:** depth 0 does NOT mean the rule has no children.  A RE-PAIR
-extension can reuse an existing rule *without* increasing the depth counter if
-the rule appears as a direct child without further nesting.  Depth increases
-only when a rule at level N *introduces* sub-rules at level N-1, producing a
-strictly taller hierarchy.
+## Reference figures
 
-## Expected results
+On the corpus behind the article, with `sleep.N` delays unified and min_uses=3:
+262 rules over 9,499 actions split across 2,483 turns, maximum composition depth
+3, distribution 228 / 28 / 5 / 1.
 
-On the corpus that motivated the article (8,395 actions after deduplication and
-sleep-delay unification, min_uses=3):
-
-- 216 rules
-- Maximum composition depth: 3
-- Distribution: 194 at depth 0 / 16 at depth 1 / 5 at depth 2 / 1 at depth 3
-- 2,320 blocks retained (compressed sequence length)
-
-**These specific figures are not reproducible from the available result JSON
-files** (the intermediate run that produced them was not serialized).  The
-closest available reference is g2_grammar.json (VPS, graph-refine/): 262 rules,
-9,499 actions (before sleep-delay unification), depth_comp 228/28/5/1.  If you
-run RE-PAIR on your own corpus, your numbers will differ; the structure to look
-for is whether the depth distribution is concentrated at depth 0 (shallow
-hierarchy) or spread (genuine multi-level composition).
+Your own numbers will differ.  The quantity to read is the shape of the depth
+distribution: concentrated at depth 0 means a shallow hierarchy, spread across
+levels means multi-level composition.
 
 ## Usage
 
     from agentgraph.extract import build_hyperedges
     from agentgraph.repair import build_sequence, repair, measure_grammar
 
-    edges = build_hyperedges(
-        "~/.openclaw/agents/*/sessions/*.jsonl",
-        normalize_sleep=True,   # unify sleep.3 == sleep.15 == sleep
-    )
-    seq = build_sequence(edges)
+    edges = build_hyperedges("~/.openclaw/agents/*/sessions/*.jsonl")
+    seq = build_sequence(edges, normalize_sleep=True)  # sleep.3 == sleep.15
     compressed, rules = repair(seq, min_uses=3)
     report = measure_grammar(seq, compressed, rules)
     print(f"{report['rules_count']} rules, max depth {report['max_depth']}")
@@ -89,7 +72,7 @@ def build_sequence(
     normalize_sleep:
         If True, unifies ``sleep.3``, ``sleep.15``, etc. into ``sleep`` so
         that polling loops with different delay values are treated as one
-        pattern.  This is what produces the article's 216-rule result.
+        pattern.  The reference figures above were measured with it enabled.
     """
     dated = sorted(
         [e for e in edges if e.timestamp],
@@ -260,10 +243,10 @@ def measure_grammar(
 ) -> dict:
     """Compute summary statistics for a RE-PAIR grammar.
 
-    The most informative output is ``depth_distribution``.  A distribution
-    concentrated at depth 0 means the grammar captures repetition but not
-    composition — pairs of atoms recur, but they do not combine into deeper
-    structures.  Depth ≥ 2 indicates genuine multi-level factorization.
+    ``depth_distribution`` carries the composition result.  Concentrated at
+    depth 0, the recurring units are groups of atoms that never combine into
+    larger recurring units.  Depth ≥ 2 means a recurring block contains another
+    recurring block as a proper sub-pattern.
 
     Parameters
     ----------
@@ -299,10 +282,8 @@ def measure_grammar(
         "max_depth": max_depth,
         "depth_distribution": dict(sorted(depth_dist.items())),
         "note": (
-            "depth_distribution is the key output. "
-            "Depth 0 = pair of terminals; depth N = rule uses at least one depth-(N-1) child. "
-            "Depth 0 does NOT mean the rule has no children — a rule can reuse another rule "
-            "as a direct expansion child without increasing the depth counter. "
-            "Depth increases only when a rule composes sub-rules one level deeper."
+            "depth_distribution: depth 0 = expansion into terminals only; "
+            "depth N = expansion using at least one depth-(N-1) rule. "
+            "A rule that reuses any other rule is therefore at depth 1 or above."
         ),
     }

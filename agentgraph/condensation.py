@@ -5,16 +5,17 @@ component (SCC) of a directed graph into a single macro-node always yields a
 DAG.  The theorem holds for *any* directed graph — it demands nothing about what
 happens inside the component (no convergence, no termination guarantee).
 
-## Why this matters for agent systems
+## What to read in the output
 
-The theorem is a tautology: "agents loop, therefore their graph contains cycles,
-therefore its condensation is a DAG" is the same as saying any graph has a DAG
-condensation.  It does not distinguish agents from batch workflows or cron jobs.
+Because the theorem holds for any directed graph, "agents loop, therefore their
+condensation is a DAG" says nothing specific about agents — it holds for batch
+workflows and cron jobs too.  The quantity to read is the **size distribution of
+the SCCs**.
 
-What *is* informative is the **size distribution of the SCCs**.
-
-- If all SCCs are singletons (size = 1), the graph is already a DAG — there is
-  no feedback at all at this level of abstraction.
+- If every SCC is a singleton (size = 1) *and* carries no self-loop, the graph is
+  already a DAG — no feedback at all at this level of abstraction. A singleton
+  with a self-loop is still a cycle, and `scc_summary()` counts it in
+  `n_cycle_sccs`; read that field, not the size distribution alone.
 - If one SCC absorbs almost every node (a "giant" component), the condensation
   collapses to a single macro-node and loses all scheduling power.
 - In between, each SCC represents a feedback zone: a set of actions that
@@ -31,9 +32,7 @@ What *is* informative is the **size distribution of the SCCs**.
     report = scc_summary(G)
     print(report)
 
-Requires networkx (listed in requirements.txt, used for display only elsewhere;
-here it performs the Tarjan SCC computation).  If networkx is unavailable, the
-module falls back to a pure-Python Tarjan implementation.
+Standard library only: the Tarjan SCC computation is in this module.
 """
 
 from __future__ import annotations
@@ -101,11 +100,15 @@ def session_transition_graph(edges: list[Hyperedge]) -> dict[str, set[str]]:
 
 
 # ---------------------------------------------------------------------------
-# SCC computation (Tarjan's algorithm — stdlib only, no networkx required)
+# SCC computation (Tarjan's algorithm)
 # ---------------------------------------------------------------------------
 
 def _tarjan_sccs(graph: dict[str, set[str]]) -> list[list[str]]:
-    """Tarjan's strongly connected components — pure Python, no dependencies."""
+    """Tarjan's strongly connected components.
+
+    Iterative, with an explicit call stack: a recursive version hits Python's
+    recursion limit on long chains of actions.
+    """
     index_counter = [0]
     stack: list[str] = []
     on_stack: set[str] = set()
@@ -113,31 +116,6 @@ def _tarjan_sccs(graph: dict[str, set[str]]) -> list[list[str]]:
     lowlink: dict[str, int] = {}
     sccs: list[list[str]] = []
 
-    def strongconnect(v: str) -> None:
-        index[v] = lowlink[v] = index_counter[0]
-        index_counter[0] += 1
-        stack.append(v)
-        on_stack.add(v)
-
-        for w in graph.get(v, set()):
-            if w not in index:
-                strongconnect(w)
-                lowlink[v] = min(lowlink[v], lowlink[w])
-            elif w in on_stack:
-                lowlink[v] = min(lowlink[v], index[w])
-
-        if lowlink[v] == index[v]:
-            scc: list[str] = []
-            while True:
-                w = stack.pop()
-                on_stack.discard(w)
-                scc.append(w)
-                if w == v:
-                    break
-            sccs.append(scc)
-
-    # Iterative version to avoid Python recursion limits on large graphs.
-    # (The recursive version above is kept for clarity; this one is used.)
     def strongconnect_iter(root: str) -> None:
         call_stack = [(root, iter(graph.get(root, set())), False)]
         index[root] = lowlink[root] = index_counter[0]
@@ -229,8 +207,7 @@ def scc_summary(graph: dict[str, set[str]]) -> SCCSummary:
 
     Pass the output of ``session_transition_graph`` or ``transition_graph``.
 
-    The informative result is the **size distribution**, not the existence of
-    cycles.  Any directed graph has SCCs.  What matters:
+    Any directed graph has SCCs, so read the size distribution:
 
     - Many small SCCs → feedback is local, condensation is informative.
     - One giant SCC → feedback spans the whole graph, condensation is trivial.
