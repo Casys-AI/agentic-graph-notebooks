@@ -40,7 +40,7 @@ OPS = {"docker", "systemctl", "kill", "ps", "top", "journalctl", "crontab",
 # block has been incorrectly split. Excluding them avoids phantom atoms such as
 # `for`, `const`, `import`.
 LANG_KEYWORDS = {
-    "for", "if", "then", "fi", "do", "done", "else", "elif", "while",
+    "for", "if", "then", "fi", "do", "done", "else", "elif", "while", "until",
     "const", "let", "var", "import", "from", "with", "def", "class",
     "return", "in", "EOF", "PY", "EOSQL",
 }
