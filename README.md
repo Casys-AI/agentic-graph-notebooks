@@ -4,7 +4,7 @@
 
 This repository ships no data. Everything runs on *your* traces, on *your* machine.
 
-[English](README.md) · [简体中文](README.zh.md) · [繁體中文](README.zh-TW.md)
+[English](README.md) · [Français](README.fr.md) · [简体中文](README.zh.md) · [繁體中文](README.zh-TW.md)
 
 ---
 
@@ -63,7 +63,8 @@ print(metrics(edges))
 ```
 
 ```
-N=465 · edges=4183 · density=0.0388 · mean degree=18.0 · entropy=7.942
+# (actual numbers depend on your corpus)
+N=<nodes> · edges=<edges> · density=<density> · mean degree=<mean_deg> · entropy=<entropy>
 → INFORMATIVE REGIME — neighbourhoods carry information
 ```
 
@@ -75,6 +76,10 @@ For another agent format, adapt `iter_tool_calls()` in `agentgraph/extract.py`. 
 | `02-granularity` | At what granularity does your graph stop being degenerate? |
 | `03-motifs` | Do your motifs have names? |
 | `04-stability` | Do your routines repeat beyond chance? |
+| `05-loops` | How many commands contain explicit loops — and how many are invisible to the graph? |
+| `06-condensation` | SCC condensation: how local is the feedback in your graph? |
+| `07-repair` | RE-PAIR grammar: recurring subsequences and how deep they compose |
+| `08-read-budget` | Reading budget: does the preceding action predict `head -n N`? |
 
 ---
 
@@ -82,7 +87,7 @@ For another agent format, adapt `iter_tool_calls()` in `agentgraph/extract.py`. 
 
 Agents that write shell do not produce *actions*, they produce *programs*. Roughly four out of five compound commands contain `&&`, `;`, `|` or a newline. Those operators are the boundaries the model itself wrote — so we split on them.
 
-Splitting naively with a regex is a trap: it also cuts inside quoted strings. `grep -E 'a|b|c'` becomes three "commands", and each fragment produces a phantom atom. On a real 2,449-command corpus that single bug manufactured **728 non-existent atoms — 47% of the vocabulary** (`awk.print1`, `awk.print2`, …).
+Splitting naively with a regex is a trap: it also cuts inside quoted strings. `grep -E 'a|b|c'` becomes three "commands", and each fragment produces a phantom atom (`awk.print1`, `awk.print2`, …) with no real command behind it. On real corpora this single bug manufactures a substantial fraction of the vocabulary from thin air.
 
 `split_segments()` uses `shlex` with `punctuation_chars`, which respects quotes. If you adapt this code, keep that property.
 
@@ -111,4 +116,4 @@ It also describes *what* an agent did, never *when* to trigger it or which preco
 
 ## License
 
-MIT. Companion article: [casys.ai/blog/dag-boucle-graphe-le-test-en-2-minutes](https://casys.ai/blog/dag-boucle-graphe-le-test-en-2-minutes)
+MIT. Companion article: [casys.ai/blog/graph-engineering-multi-agentic-systems](https://casys.ai/blog/graph-engineering-multi-agentic-systems)

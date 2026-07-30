@@ -144,10 +144,9 @@ def split_segments(command: str) -> list[str]:
     WARNING — this is where the most important correctness decision in the whole
     module lives. A naive regex split on `|` also cuts inside quoted strings:
     `grep -E 'a|b|c'` then becomes three "commands", and each fragment produces
-    a phantom atom.
-
-    On a real corpus of 2,449 commands, that single bug manufactured 728
-    non-existent atoms — 47% of the vocabulary (`awk.print1`, `awk.print2`, …).
+    a phantom atom (`awk.print1`, `awk.print2`, …) that has no real command
+    behind it.  On real corpora this single bug manufactures a substantial
+    fraction of the vocabulary from thin air.
 
     `shlex` with `punctuation_chars` respects quotes and avoids this.
     """

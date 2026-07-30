@@ -63,7 +63,8 @@ print(metrics(edges))
 ```
 
 ```
-N=465 · edges=4183 · density=0.0388 · mean degree=18.0 · entropy=7.942
+# （实际数值取决于你的语料库）
+N=<节点数> · edges=<边数> · density=<密度> · mean degree=<平均度> · entropy=<熵>
 → INFORMATIVE REGIME — neighbourhoods carry information
 ```
 
@@ -75,6 +76,10 @@ N=465 · edges=4183 · density=0.0388 · mean degree=18.0 · entropy=7.942
 | `02-granularity` | 在哪种粒度下图不再退化？ |
 | `03-motifs` | 你的模式有名字吗？ |
 | `04-stability` | 你的例程是否超越偶然性地重复出现？ |
+| `05-loops` | 有多少命令包含显式循环——其中有多少对图不可见？ |
+| `06-condensation` | SCC 凝聚：图中的反馈有多局部？ |
+| `07-repair` | RE-PAIR 语法：重复子序列及其组合深度 |
+| `08-read-budget` | 读取预算：前一个动作是否能预测 `head -n N`？ |
 
 ---
 
@@ -82,7 +87,7 @@ N=465 · edges=4183 · density=0.0388 · mean degree=18.0 · entropy=7.942
 
 写 shell 的智能体生产的不是*动作*，而是*程序*。粗略来看，每五条复合命令中约有四条包含 `&&`、`;`、`|` 或换行符。这些操作符正是模型自己写下的分界——我们就在这些地方分割。
 
-用正则表达式朴素地分割是一个陷阱：它同样会在引号内部的字符串中切割。`grep -E 'a|b|c'` 会变成三条"命令"，每个片段都会产生一个幽灵原子。在一个真实的 2449 条命令的语料库上，这一个 bug 制造了 **728 个不存在的原子——占词汇量的 47%**（`awk.print1`、`awk.print2`……）。
+用正则表达式朴素地分割是一个陷阱：它同样会在引号内部的字符串中切割。`grep -E 'a|b|c'` 会变成三条"命令"，每个片段都会产生一个幽灵原子（`awk.print1`、`awk.print2`……），背后根本没有真实命令。在真实语料库上，这一个 bug 会凭空制造出相当大比例的虚假词汇。
 
 `split_segments()` 使用带 `punctuation_chars` 的 `shlex`，它能正确处理引号。如果你要改写这段代码，请保留这一属性。
 
@@ -111,4 +116,4 @@ N=465 · edges=4183 · density=0.0388 · mean degree=18.0 · entropy=7.942
 
 ## 许可证
 
-MIT。配套文章：[casys.ai/blog/dag-boucle-graphe-le-test-en-2-minutes](https://casys.ai/blog/dag-boucle-graphe-le-test-en-2-minutes)
+MIT。配套文章：[casys.ai/zh/blog/graph-engineering-multi-agentic-systems](https://casys.ai/zh/blog/graph-engineering-multi-agentic-systems)
