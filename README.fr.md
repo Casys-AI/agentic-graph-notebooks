@@ -1,40 +1,28 @@
 # agentic-graph-notebooks
 
-**Transforme tes propres traces d'exécution d'agents en graphe — puis vérifie si ce graphe signifie quelque chose.**
+Construis un graphe d'actions à partir de tes propres traces d'exécution d'agents, puis teste si ce graphe porte de l'information.
 
-Ce dépôt ne contient aucune donnée. Tout s'exécute sur *tes* traces, sur *ta* machine.
+Aucune donnée n'est fournie. Tout s'exécute en local, sur tes traces.
 
-[English](README.md) · [简体中文](README.zh.md) · [繁體中文](README.zh-TW.md) · [Français](README.fr.md)
-
----
-
-## Pourquoi
-
-En juillet 2026, le débat « boucles vs graphes » a produit beaucoup d'affirmations et très peu de mesures. Ces notebooks font le contraire : un protocole reproductible qui répond à trois questions sur tes propres agents.
-
-**1. Le graphe a-t-il la bonne forme ?**
-
-Un graphe n'est utile que si connaître les voisins d'un nœud te dit quelque chose de *spécifique à ce nœud*. Il y a deux façons opposées d'échouer. Trop épars : la plupart des nœuds n'ont pas de voisins, il n'y a rien à observer. Trop dense : chaque nœud touche presque tous les autres, donc le voisinage de A est identique à celui de B et ne discrimine rien. L'information ne vit qu'entre ces deux extrêmes.
-
-**2. Le graphe signifie-t-il quelque chose ?**
-
-Un motif statistique sans nom humain ne prouve rien. Ces notebooks remontent toujours des motifs vers les vraies commandes, pour que tu puisses juger toi-même — en distinguant les motifs exploitables, les motifs réels mais triviaux (`cd` puis `ls` est un motif réel et inutile) et les purs artefacts.
-
-**3. Le graphe se répète-t-il ?**
-
-C'est la question qui décide si « mémoire procédurale » signifie quelque chose. C'est aussi là où presque tout le monde se trompe, car y répondre honnêtement exige une ligne de base aléatoire.
+[English](README.md) · [Français](README.fr.md) · [简体中文](README.zh.md) · [繁體中文](README.zh-TW.md)
 
 ---
 
-## La ligne de base aléatoire, et pourquoi elle change tout
+## Périmètre
 
-Deux fenêtres temporelles du même agent partagent nécessairement du vocabulaire : même machine, mêmes outils, même personne. Un score de persistance brut est donc **ininterprétable** — et il sera élevé, donc convaincant.
+**1. Forme du graphe.** Un voisinage n'est informatif que s'il diffère d'un nœud à l'autre. Deux modes d'échec : trop épars, où le nœud moyen ne touche presque aucun des autres et où il reste peu de cooccurrences à comparer, et trop dense, où le nœud moyen en touche une large part et les voisinages ne discriminent plus. `metrics()` rapporte densité, degré moyen et entropie de degré, et signale les deux régimes. La densité est le degré moyen exprimé en fraction des autres nœuds, donc une moyenne globale — lis l'entropie de degré à côté, car un graphe globalement épars peut abriter un nœud relié à tout.
 
-La seule question qui compte : *au-delà du hasard ?*
+**2. Interprétabilité des motifs.** Chaque motif est remonté jusqu'aux commandes qui l'ont produit. Les motifs triviaux (`cd` puis `ls`) et les artefacts de parsing se distinguent des motifs exploitables par inspection, pas par score.
 
-Ces notebooks redistribuent aléatoirement les mêmes actions dans les mêmes fenêtres, vingt fois, et comparent. Sur le corpus qui a motivé ce travail, une mesure de persistance de voisinage a atteint une médiane de **1,000** — résultat spectaculaire, jusqu'à ce que la ligne de base aléatoire retourne aussi **1,000**. Le répertoire d'actions était simplement trop étroit pour varier.
+**3. Répétition au-delà du hasard.** Deux fenêtres temporelles du même agent partagent le plus souvent du vocabulaire : même machine, mêmes outils, même opérateur. Un score de persistance brut n'est pas interprétable seul.
 
-Sans ce contrôle, ce chiffre aurait été publié comme une découverte.
+---
+
+## Ligne de base aléatoire
+
+`temporal_stability()` redistribue les mêmes actions dans les mêmes fenêtres — 20 tirages, graine fixée — et rapporte le score observé à côté de la distribution obtenue par mélange.
+
+Sur le corpus qui a motivé ce travail, une mesure de persistance de voisinage a atteint une médiane de 1,000. La ligne de base par mélange a retourné 1,000 elle aussi : le répertoire d'actions était trop étroit pour varier, et la mesure ne portait aucun signal.
 
 ---
 
@@ -47,13 +35,13 @@ pip install -r requirements.txt
 jupyter lab
 ```
 
-Pas de dépendances lourdes. La détection de communautés et la corrélation de Spearman sont implémentées en Python pur ; `networkx` et `matplotlib` servent uniquement à l'affichage.
+`agentgraph/` ne dépend que de la bibliothèque standard. Détection de communautés, corrélation de Spearman, SCC de Tarjan et Kruskal-Wallis sont implémentés dans l'arbre. `requirements.txt` n'installe que JupyterLab.
 
 ---
 
-## Utilisation
+## Format d'entrée
 
-Les notebooks attendent des sessions JSONL — un événement par ligne, avec des blocs `toolCall`. Le format OpenClaw fonctionne tel quel :
+Les notebooks lisent des sessions JSONL, un événement par ligne, contenant des blocs `toolCall`. Les traces OpenClaw fonctionnent tel quel :
 
 ```python
 from agentgraph import build_hyperedges, metrics
@@ -63,54 +51,51 @@ print(metrics(edges))
 ```
 
 ```
-# (les valeurs réelles dépendent de ton corpus)
 N=<nœuds> · edges=<arêtes> · density=<densité> · mean degree=<degré moyen> · entropy=<entropie>
-→ INFORMATIVE REGIME — neighbourhoods carry information
+→ INFORMATIVE REGIME — density between 0.002 and 0.15
 ```
 
-Pour adapter un autre format d'agent, modifie `iter_tool_calls()` dans `agentgraph/extract.py`. C'est le seul point d'entrée à changer.
+Pour tout autre agent, adapte `iter_tool_calls()` dans `agentgraph/extract.py`. C'est le seul point d'entrée qui dépend du format de trace : tout l'aval consomme des objets `ToolCall` ou un itérateur de paires `(call, command)`. Un adaptateur Claude Code mappe les blocs `tool_use` et leur champ `input` en une vingtaine de lignes.
 
-| Notebook | Question |
+| Notebook | Mesure |
 |---|---|
-| `01-extract` | Qu'y a-t-il dans tes traces ? Distribution des outils, part du shell |
-| `02-granularity` | À quelle granularité ton graphe cesse-t-il d'être dégénéré ? |
-| `03-motifs` | Tes motifs ont-ils des noms ? |
-| `04-stability` | Tes routines se répètent-elles au-delà du hasard ? |
-| `05-loops` | Combien de commandes contiennent des boucles explicites — et combien sont invisibles au graphe ? |
-| `06-condensation` | Condensation SCC : à quel point les boucles de rétroaction sont-elles locales ? |
+| `01-extract` | Distribution des outils, part des commandes shell |
+| `02-granularity` | Densité et entropie selon les variantes de granularité |
+| `03-motifs` | Motifs fréquents, remontés jusqu'à leurs commandes |
+| `04-stability` | Persistance des motifs face à une ligne de base par mélange |
+| `05-loops` | Boucles shell explicites, et la fraction invisible à un graphe de segments |
+| `06-condensation` | Condensation SCC et localité de la rétroaction |
 | `07-repair` | Grammaire RE-PAIR : sous-séquences récurrentes et profondeur de composition |
-| `08-read-budget` | Budget de lecture : l'action précédente prédit-elle `head -n N` ? |
+| `08-read-budget` | Si l'action précédente prédit `head -n N` |
 
 ---
 
-## Un détail de parsing plus important qu'il n'y paraît
+## Segmentation
 
-Les agents qui écrivent du shell ne produisent pas des *actions*, ils produisent des *programmes*. En gros, quatre commandes composées sur cinq contiennent `&&`, `;`, `|` ou un retour à la ligne. Ces opérateurs sont les frontières que le modèle lui-même a écrites — on segmente à ces endroits.
+Les commandes composées dominent : environ quatre sur cinq contiennent `&&`, `;`, `|` ou un retour à la ligne. Ces opérateurs sont des frontières que le modèle a écrites lui-même, la segmentation coupe donc à ces endroits.
 
-Segmenter naïvement avec une regex est un piège : elle coupe aussi à l'intérieur des chaînes entre guillemets. `grep -E 'a|b|c'` devient trois « commandes », et chaque fragment produit un atome fantôme (`awk.print1`, `awk.print2`, …) sans aucune commande réelle derrière. Sur des corpus réels, ce seul bug fabrique une fraction substantielle du vocabulaire à partir de rien.
+Une segmentation par regex coupe aussi à l'intérieur des chaînes entre guillemets. `grep -E 'a|b|c'` donne trois fragments, et chacun produit un atome (`awk.print1`, `awk.print2`, …) sans commande derrière. Sur des corpus réels, cela gonfle le vocabulaire de façon substantielle. `split_segments()` utilise `shlex` avec `punctuation_chars`, ce qui respecte les guillemets — conserve cette propriété si tu adaptes le code.
 
-`split_segments()` utilise `shlex` avec `punctuation_chars`, ce qui respecte les guillemets. Si tu adaptes ce code, conserve cette propriété.
-
-L'inline Python bénéficie d'un vrai AST plutôt que d'expressions régulières — un avantage décisif par rapport au shell, qui ne se prête qu'à des heuristiques.
+Le Python inline est parsé avec `ast`. Le shell n'a pas d'équivalent et reste traité par heuristiques.
 
 ---
 
-## Deux avertissements
+## Avertissements
 
-**Tes traces contiennent des secrets.** Pas accidentellement — systématiquement : Bearer tokens, clés API, variables d'environnement en clair. `mask_secrets()` filtre les formes courantes et s'applique à toutes les sorties de motifs, mais réduit le risque sans l'éliminer. **Relis toujours les sorties avant de les partager.**
+**Les traces contiennent des secrets en clair** : Bearer tokens, clés API, variables d'environnement. `mask_secrets()` filtre les formes courantes et s'applique aux sorties de motifs. Cela réduit le risque sans l'éliminer. Relis les sorties avant de les partager.
 
-**Deux pièges méthodologiques** que les notebooks signalent mais ne peuvent pas corriger pour toi :
+Deux effets que les notebooks détectent sans les corriger :
 
-- *Autocorrélation de session* — les commandes d'une même session se ressemblent nécessairement. Si une seule session domine une fenêtre, la « stabilité » mesurée n'est que la cohérence interne de cette session. `describe_windows()` avertit au-delà de 40 %.
-- *Mélange d'agents* — si tes fenêtres temporelles correspondent à des agents différents, tu mesures une différence d'identité, pas une dérive dans le temps. Filtre sur un seul agent avant de lancer l'analyse de stabilité.
+- **Autocorrélation de session.** Les commandes d'une même session se ressemblent. Si une seule session domine une fenêtre, la stabilité mesurée reflète la cohérence interne de cette session. `describe_windows()` avertit au-delà de 40 %.
+- **Mélange d'agents.** Si les fenêtres correspondent à des agents différents, la mesure capte une différence d'identité plutôt qu'une dérive dans le temps. Filtre sur un seul agent avant l'analyse de stabilité.
 
 ---
 
-## Ce que ce protocole ne fait pas
+## Limites
 
-Il mesure la **forme** du graphe et la **répétition** de ses motifs. Il ne valide aucune tâche aval : un graphe bien formé n'est pas la preuve qu'il améliore une prédiction, une décision de routage ou une recommandation. Condition nécessaire, pas suffisante.
+Le protocole mesure la forme du graphe et la répétition de ses motifs. Il n'évalue aucune tâche aval : un graphe bien formé ne prouve pas qu'une prédiction, un routage ou une recommandation s'améliorent.
 
-Il décrit *ce que* l'agent a fait, jamais *quand* le déclencher ni quelle précondition vérifier. C'est la frontière entre un graphe et une procédure rejouable.
+Il enregistre les actions qu'un agent a prises, sans leurs conditions de déclenchement ni leurs préconditions. Une procédure rejouable a besoin des deux.
 
 ---
 
