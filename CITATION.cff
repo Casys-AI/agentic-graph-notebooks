@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "agentic-graph-notebooks: Reproducible notebooks — turn your own agent execution traces into a graph, and measure whether it means anything."
+authors:
+  - family-names: Pesle
+    given-names: Erwan Lee
+year: 2026
+license: MIT
+repository-code: https://github.com/Casys-AI/agentic-graph-notebooks
+type: software
